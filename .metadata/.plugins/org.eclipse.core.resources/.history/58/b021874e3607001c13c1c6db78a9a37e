@@ -1,0 +1,2338 @@
+/*******************************************************************************
+ * Copyright (C) 2019 Tarana Wireless, Inc. All Rights Reserved.
+ ******************************************************************************/
+
+package com.tarana.tcc.deviceconfig.service.component;
+
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.AZIMUTH_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.CELL_ID_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.CLASSIFIER_TYPE;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.CLASSIFIER_TYPE_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.HOSTNAME;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.HOSTNAME_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.LATITUDE;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.LATITUDE_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.LONGITUDE;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.LONGITUDE_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.MANAGEMENT_IP_PREFIX;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.MANAGEMENT_IP_PREFIX_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.NETWORK_PROFILE;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.NETWORK_PROFILE_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.RADIO_OPERATOR_ID;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.RADIO_OPERATOR_ID_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.SECTOR_ID_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.SET_ID_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.SLA_PROFILE;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.STARTUP_CONFIG_VERSION;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.TRANSMISSION_ENABLED;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.TRANSMISSION_ENABLED_YANG_PATH;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.getDataVlanYangPath;
+import static com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant.getSlaProfileYangPath;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.tarana.tcc.common.authorization.component.UserResolver;
+import com.tarana.tcc.common.authorization.model.User;
+import com.tarana.tcc.common.authorization.util.UserAuthorizationUtil;
+import com.tarana.tcc.common.exceptions.ForbiddenAccessException;
+import com.tarana.tcc.common.exceptions.ResourceNotFoundException;
+import com.tarana.tcc.common.exceptions.SystemException;
+import com.tarana.tcc.deviceconfig.model.operation.DeviceConfigOperationResponse;
+import com.tarana.tcc.deviceconfig.model.operation.SaveDeviceConfigRequest;
+import com.tarana.tcc.deviceconfig.model.operation.SetDeviceConfigRequest;
+import com.tarana.tcc.deviceconfig.model.path.ConfigPath;
+import com.tarana.tcc.deviceconfig.service.component.resolver.ConfigurationResolveStrategy;
+import com.tarana.tcc.deviceconfig.service.component.resolver.DefaultConfigurationResolver;
+import com.tarana.tcc.deviceconfig.service.config.DefaultStartupWhitelistConfig;
+import com.tarana.tcc.deviceconfig.service.constant.DefaultStartUpConfigConstant;
+import com.tarana.tcc.deviceconfig.service.constant.EntityType;
+import com.tarana.tcc.deviceconfig.service.constant.ValueType;
+import com.tarana.tcc.deviceconfig.service.entity.ApplicableTarget;
+import com.tarana.tcc.deviceconfig.service.entity.ConfigDbEntity;
+import com.tarana.tcc.deviceconfig.service.entity.ConfigDetails;
+import com.tarana.tcc.deviceconfig.service.entity.ConfigId;
+import com.tarana.tcc.deviceconfig.service.entity.Configuration;
+import com.tarana.tcc.deviceconfig.service.entity.DeviceInitialConfigStateEntity;
+import com.tarana.tcc.deviceconfig.service.entity.DeviceType;
+import com.tarana.tcc.deviceconfig.service.entity.OperationDbEntity;
+import com.tarana.tcc.deviceconfig.service.entity.PathValue;
+import com.tarana.tcc.deviceconfig.service.entity.SetConfigParams;
+import com.tarana.tcc.deviceconfig.service.mapper.ConfigPathMapper;
+import com.tarana.tcc.deviceconfig.service.mapper.DeviceConfigResponseMapper;
+import com.tarana.tcc.deviceconfig.service.mapper.OperationResponseMapper;
+import com.tarana.tcc.deviceconfig.service.repository.NetworkInfoServiceRepository;
+import com.tarana.tcc.deviceconfig.service.repository.configuration.ConfigDbRepository;
+import com.tarana.tcc.deviceconfig.service.repository.configuration.DeviceInitialConfigStateDbRepository;
+import com.tarana.tcc.deviceconfig.service.repository.configuration.OperationDbRepository;
+import com.tarana.tcc.deviceconfig.service.repository.configuration.TccConfigRepository;
+import com.tarana.tcc.deviceconfig.service.repository.device.DeviceOperationsRepository;
+import com.tarana.tcc.deviceconfig.service.swf.workflow.SaveDeviceConfigWorkflowClientExternalFactory;
+import com.tarana.tcc.deviceconfig.service.swf.workflow.SetDeviceConfigWorkflowClientExternal;
+import com.tarana.tcc.deviceconfig.service.swf.workflow.SetDeviceConfigWorkflowClientExternalFactory;
+import com.tarana.tcc.events.model.Event.Context;
+import com.tarana.tcc.networkinfo.model.Ancestry;
+import com.tarana.tcc.networkinfo.model.Carrier;
+import com.tarana.tcc.networkinfo.model.CellDetails;
+import com.tarana.tcc.networkinfo.model.DeviceDetails;
+import com.tarana.tcc.networkinfo.model.OperatorDetails;
+import com.tarana.tcc.networkinfo.model.SavedDeviceConfigDetails;
+import com.tarana.tcc.networkinfo.model.SectorDetails;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import javax.annotation.Resource;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.util.ReflectionTestUtils;
+
+/**
+ * Tests for {@link DefaultStartUpConfigManager}
+ *
+ * @author nagesh.salunke
+ */
+@RunWith(SpringRunner.class)
+@SpringBootTest(classes = {DefaultStartUpConfigManager.class})
+public class DefaultStartUpConfigManagerTests {
+
+  @Rule
+  public ExpectedException thrown = ExpectedException.none();
+  @Resource(name = DefaultStartUpConfigManager.BEAN_NAME)
+  private DefaultStartUpConfigManager deviceConfigManager;
+  @MockBean(name = NetworkInfoServiceRepository.BEAN_NAME)
+  private NetworkInfoServiceRepository networkInfoServiceRepository;
+  @MockBean(name = ConfigDbRepository.BEAN_NAME)
+  private ConfigDbRepository configDbRepository;
+  @MockBean(name = OperationDbRepository.BEAN_NAME)
+  private OperationDbRepository operationDbRepository;
+  @MockBean(name = TccConfigRepository.BEAN_NAME)
+  private TccConfigRepository tccConfigRepository;
+  @MockBean(name = DeviceOperationsRepository.BEAN_NAME)
+  private DeviceOperationsRepository deviceOperationsRepository;
+  @MockBean(name = DeviceConfigResponseMapper.BEAN_NAME)
+  private DeviceConfigResponseMapper deviceConfigResponseMapper;
+  @MockBean(name = OperationResponseMapper.BEAN_NAME)
+  private OperationResponseMapper operationResponseMapper;
+  @MockBean(name = DefaultConfigurationResolver.BEAN_NAME)
+  private ConfigurationResolveStrategy configurationResolveStrategy;
+  @MockBean(name = DeviceInitialConfigStateDbRepository.BEAN_NAME)
+  private DeviceInitialConfigStateDbRepository deviceInitialConfigStateDbRepository;
+  @MockBean
+  private SetDeviceConfigWorkflowClientExternalFactory setConfigurationwfClientExternalFactory;
+  @MockBean
+  private SaveDeviceConfigWorkflowClientExternalFactory saveConfigurationwfClientExternalFactory;
+  @MockBean(name = ConfigPathComponent.BEAN_NAME)
+  private ConfigPathComponent configPathComponent;
+  @MockBean
+  private UserResolver userResolver;
+  @MockBean(name = DefaultStartupWhitelistConfig.BEAN_NAME)
+  private DefaultStartupWhitelistConfig defaultStartupWhitelistConfig;
+  @MockBean
+  private UserAuthorizationUtil userAuthorizationUtil;
+  @MockBean(name = EventLogger.BEAN_NAME)
+  private EventLogger eventLogger;
+  private User user = User.builder()
+      .operatorId("1")
+      .retailerId("1")
+      .username("someuser")
+      .build();
+
+  @Before
+  public void setUp() throws ForbiddenAccessException {
+    when(userResolver.resolve()).thenReturn(Optional.of(user));
+    when(defaultStartupWhitelistConfig.isConfigWhiteListed(anyString(), anyString()))
+        .thenReturn(true);
+    doNothing().when(userAuthorizationUtil).checkUserAuthorization(anyString(), anyString(),
+        anyString());
+  }
+
+  @Test
+  public void pushDeviceInitialConfiguration_validSlaProfile_slaProfilePushed()
+      throws ResourceNotFoundException, SystemException, ForbiddenAccessException {
+    when(networkInfoServiceRepository.validateEntity(any(), any())).thenReturn(true);
+    when(userResolver.resolve()).thenReturn(Optional.empty());
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    mockConfigPathForDefaults();
+    when(operationDbRepository.save(any())).thenReturn(new OperationDbEntity());
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    deviceDetails.setId("BNDevice");
+    deviceDetails.setConfigPushEnabled(true);
+    deviceDetails.setType("BN");
+    when(networkInfoServiceRepository.getDeviceDetails("BNDevice"))
+        .thenReturn(deviceDetails);
+    DeviceDetails rnDevice = buildDeviceDetails();
+    rnDevice.setId("RNDevice");
+    rnDevice.setType("RN");
+    rnDevice.setSerialNumber("rnSerialNumber");
+    rnDevice.setMasterId("BNDevice");
+    rnDevice.setConfigPushEnabled(true);
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setSlaProfile("gold");
+    savedDeviceConfigDetails.setHostName("h1");
+    savedDeviceConfigDetails.setLatitude(10.1d);
+    savedDeviceConfigDetails.setLongitude(12.4d);
+    savedDeviceConfigDetails.setAntennaAzimuth(15.4d);
+    savedDeviceConfigDetails.setDataVlan(null);
+    rnDevice.setSavedConfig(savedDeviceConfigDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("RNDevice"))
+        .thenReturn(rnDevice);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(2);
+    sectorDetails.setNetworkId(0);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setId(5);
+    cellDetails.setNetworkId(1);
+    when(networkInfoServiceRepository.getSectorDetails(any())).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(anyInt())).thenReturn(cellDetails);
+    deviceConfigManager.pushDeviceInitialConfiguration("RNDevice", true, false, Context.TCS);
+    ArgumentCaptor<ConfigDbEntity> configDbEntity = ArgumentCaptor.forClass(ConfigDbEntity.class);
+
+    verify(operationDbRepository, times(1)).save(any());
+    verify(configDbRepository, times(1)).save(configDbEntity.capture());
+    verify(deviceInitialConfigStateDbRepository, times(0)).save(any());
+    verify(networkInfoServiceRepository, times(1)).getDeviceDetails("RNDevice");
+    verify(eventLogger, times(1)).logEvent(anyString(), any(), any(), any(), any());
+    Configuration configuration = configDbEntity.getValue().getConfiguration();
+    Assert.assertEquals(5, configuration.getConfig().keySet().size());
+    Assert.assertEquals(12.4d,
+        configuration.getConfig().get("/system/install/config/longitude").getPathValue()
+            .getValue());
+    Assert.assertEquals(10.1d,
+        configuration.getConfig().get("/system/install/config/latitude").getPathValue().getValue());
+    Assert.assertEquals("h1",
+        configuration.getConfig().get("/system/config/hostname").getPathValue().getValue());
+    Assert.assertFalse(configuration.getConfig()
+        .containsKey("connections/connection[device-id=rnSerialNumber]/config/data-vlan"));
+    Assert.assertEquals("gold",
+        configuration.getConfig()
+            .get("/connections/connection[device-id=rnSerialNumber]/config/sla-profile")
+            .getPathValue().getValue());
+    Assert.assertEquals(15.4d,
+        configuration.getConfig().get("/system/install/config/azimuth").getPathValue().getValue());
+  }
+
+  @Test
+  public void pushDeviceInitialConfiguration_invalidSLAProfileDetails_slaProfileNotPushed()
+      throws ResourceNotFoundException, SystemException, ForbiddenAccessException {
+    when(networkInfoServiceRepository.validateEntity(any(), any())).thenReturn(true);
+    when(userResolver.resolve()).thenReturn(Optional.empty());
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(operationDbRepository.save(any())).thenReturn(new OperationDbEntity());
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    deviceDetails.setId("BNDevice");
+    deviceDetails.setConfigPushEnabled(true);
+    deviceDetails.setType("BN");
+    when(networkInfoServiceRepository.getDeviceDetails("BNDevice"))
+        .thenReturn(deviceDetails);
+    DeviceDetails rnDevice = buildDeviceDetails();
+    rnDevice.setId("RNDevice");
+    rnDevice.setType("RN");
+    rnDevice.setConfigPushEnabled(true);
+    rnDevice.setSerialNumber("rnSerialNumber");
+    rnDevice.setMasterId("BNDevice");
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setSlaProfile(null);
+    savedDeviceConfigDetails.setLatitude(10.1d);
+    savedDeviceConfigDetails.setLongitude(19.2d);
+    savedDeviceConfigDetails.setDataVlan(null);
+    rnDevice.setSavedConfig(savedDeviceConfigDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("RNDevice"))
+        .thenReturn(rnDevice);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(2);
+    sectorDetails.setNetworkId(0);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setId(5);
+    cellDetails.setNetworkId(1);
+    when(networkInfoServiceRepository.getSectorDetails(any())).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(anyInt())).thenReturn(cellDetails);
+    Map<String, ConfigDetails> configDetailsMap = new HashMap<>();
+    configDetailsMap.put("/connections/connection[device-id=rnSerialNumber]/config/sla-profile",
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().value("max").valueType(ValueType.STRING).build())
+            .build());
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configuration(Configuration.builder().config(configDetailsMap).build())
+        .build();
+    when(configDbRepository.getConfigDbEntity(EntityType.DEVICE, "RNDevice", "startup_v1.0",
+        DeviceType.RN))
+        .thenReturn(configDbEntity);
+
+    deviceConfigManager.pushDeviceInitialConfiguration("RNDevice", true, false, Context.TCS);
+
+    verify(operationDbRepository, times(1)).save(any(OperationDbEntity.class));
+    ArgumentCaptor<ConfigDbEntity> savedConfigDb = ArgumentCaptor.forClass(ConfigDbEntity.class);
+    verify(configDbRepository, times(1)).save(savedConfigDb.capture());
+    //sla=profile though was previously computed, will not be pushed since new computation makes it invalid.
+    Assert.assertEquals(3, savedConfigDb.getValue().getConfiguration().getConfig().size());
+    verify(networkInfoServiceRepository, times(1)).getDeviceDetails("RNDevice");
+  }
+
+  @Test(expected = SystemException.class)
+  public void pushDeviceInitialConfigurationBN_validDetailsConnectedFalseValidateEndpoint_noConfigPushed()
+      throws ResourceNotFoundException, SystemException, ForbiddenAccessException {
+    when(networkInfoServiceRepository.validateEntity(any(), any())).thenReturn(true);
+    when(userResolver.resolve()).thenReturn(Optional.empty());
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(operationDbRepository.save(any())).thenReturn(new OperationDbEntity());
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    deviceDetails.setConnected(false);
+    deviceDetails.setConfigPushEnabled(true);
+    when(networkInfoServiceRepository.validateEndpoint(any())).thenReturn(false);
+    deviceDetails.setType("BN");
+    when(networkInfoServiceRepository.getDeviceDetails(any()))
+        .thenReturn(deviceDetails);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(2);
+    sectorDetails.setNetworkId(0);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setId(5);
+    cellDetails.setNetworkId(1);
+    when(networkInfoServiceRepository.getSectorDetails(any())).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(anyInt())).thenReturn(cellDetails);
+    deviceConfigManager.pushDeviceInitialConfiguration("1", false, false, Context.TCS);
+
+    verify(operationDbRepository, times(0)).save(any(OperationDbEntity.class));
+    verify(configDbRepository, times(0)).save(any());
+  }
+
+  @Test
+  public void pushDeviceInitialConfigurationBN_validDetailsConnectedTrueValidateEndpoint_configPushed()
+      throws ResourceNotFoundException, SystemException, ForbiddenAccessException {
+    when(networkInfoServiceRepository.validateEntity(any(), any())).thenReturn(true);
+    when(userResolver.resolve()).thenReturn(Optional.empty());
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(operationDbRepository.save(any())).thenReturn(new OperationDbEntity());
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    deviceDetails.setType("BN");
+    savedDeviceConfigDetails.setNetworkProfile(0);
+    savedDeviceConfigDetails.setMuteMode(false);
+    savedDeviceConfigDetails.setAntennaAzimuth(27.6d);
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    deviceDetails.setBootId("1");
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setHostName("h1");
+    deviceDetails.setConfigPushEnabled(true);
+    savedDeviceConfigDetails.setRadioOperatorId(1);
+    Carrier carrier1 = new Carrier();
+    carrier1.setChannelWidth(10);
+    carrier1.setFrequency(20);
+    Carrier carrier2 = new Carrier();
+    carrier2.setChannelWidth(20);
+    carrier2.setFrequency(40);
+    savedDeviceConfigDetails.setCarrier1(carrier1);
+    savedDeviceConfigDetails.setCarrier2(carrier2);
+    savedDeviceConfigDetails.setRadioOperatorId(0);
+    savedDeviceConfigDetails.setManagementSubnet("10.11.8.0/22");
+    deviceDetails.setConnected(true);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    when(networkInfoServiceRepository.getDeviceDetails(any())).thenReturn(deviceDetails);
+    when(networkInfoServiceRepository.getDeviceDetails(any()))
+        .thenReturn(deviceDetails);
+    mockConfigPathForDefaults();
+    when(defaultStartupWhitelistConfig.isConfigWhiteListed("default-hostname", "BN"))
+        .thenReturn(false);
+    deviceConfigManager.pushDeviceInitialConfiguration("1", false, false, Context.TCS);
+    ArgumentCaptor<ConfigDbEntity> configDbEntityArgumentCaptor = ArgumentCaptor
+        .forClass(ConfigDbEntity.class);
+    verify(operationDbRepository, times(1)).save(any(OperationDbEntity.class));
+    verify(configDbRepository, times(1)).save(configDbEntityArgumentCaptor.capture());
+    ConfigDbEntity configDbEntity = configDbEntityArgumentCaptor.getValue();
+    Assert.assertEquals(16, configDbEntity.getConfiguration().getConfig().size());
+    Map<String, ConfigDetails> configDetailsMap = configDbEntity.getConfiguration().getConfig();
+    Assert.assertFalse(configDetailsMap.containsKey("/system/config/hostname"));
+    Assert.assertTrue(configDetailsMap.containsKey("/system/management/config/ip-prefix"));
+    Assert.assertTrue(configDetailsMap.containsKey("/system/install/config/azimuth"));
+  }
+
+  @Test
+  public void pushDeviceInitialConfigurationForBN_validDetails_success()
+      throws ResourceNotFoundException, SystemException, ForbiddenAccessException {
+    when(networkInfoServiceRepository.validateEntity(any(), any())).thenReturn(true);
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(new HashMap<>()).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository.getConfigDbEntity(any(), any(), anyString(), any()))
+        .thenReturn(configDbEntity);
+    when(userResolver.resolve()).thenReturn(Optional.empty());
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(2);
+    sectorDetails.setNetworkId(0);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setId(5);
+    cellDetails.setRadioSetId(10);
+    cellDetails.setNetworkId(1);
+    when(networkInfoServiceRepository.getSectorDetails(any())).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(anyInt())).thenReturn(cellDetails);
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor =
+        ArgumentCaptor.forClass(SetConfigParams.class);
+    ArgumentCaptor<OperationDbEntity> operationDbEntityArgumentCaptor = ArgumentCaptor
+        .forClass(OperationDbEntity.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationDbRepository.save(any())).thenReturn(new OperationDbEntity());
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    deviceDetails.setType("BN");
+    savedDeviceConfigDetails.setNetworkProfile(0);
+    savedDeviceConfigDetails.setRadioSetId(10);
+    savedDeviceConfigDetails.setRadioCellId(1);
+    savedDeviceConfigDetails.setRadioSectorId(0);
+    savedDeviceConfigDetails.setRadioOperatorId(0);
+    savedDeviceConfigDetails.setMuteMode(false);
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    deviceDetails.setBootId("1");
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+    Carrier carrier1 = new Carrier();
+    carrier1.setChannelWidth(10);
+    carrier1.setFrequency(20);
+    Carrier carrier2 = new Carrier();
+    carrier2.setChannelWidth(20);
+    carrier2.setFrequency(40);
+    savedDeviceConfigDetails.setCarrier1(carrier1);
+    savedDeviceConfigDetails.setCarrier2(carrier2);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    when(networkInfoServiceRepository.getDeviceDetails(any())).thenReturn(deviceDetails);
+    when(operationResponseMapper.buildOperationResponse(operationDbEntityArgumentCaptor.capture()))
+        .thenReturn(new DeviceConfigOperationResponse());
+    mockConfigPathForDefaults();
+    deviceConfigManager.pushDeviceInitialConfiguration("1", false, false, Context.TCS);
+    Assert.assertEquals(DeviceType.BN, setConfigParamsArgumentCaptor.getValue().getDeviceType());
+    Assert.assertNotNull(operationDbEntityArgumentCaptor.getValue().getOpId());
+    verify(operationDbRepository, times(1)).save(any(OperationDbEntity.class));
+    Assert.assertEquals(1, operationDbEntityArgumentCaptor.getAllValues().size());
+    verify(configDbRepository, times(1)).save(configDbEntity);
+  }
+
+  @Test
+  public void pushDeviceInitialConfigurationForBNSkipConfigPushEnabledCheck_validDetails_success()
+      throws ResourceNotFoundException, SystemException, ForbiddenAccessException {
+    when(networkInfoServiceRepository.validateEntity(any(), any())).thenReturn(true);
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(new HashMap<>()).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository.getConfigDbEntity(any(), any(), anyString(), any()))
+        .thenReturn(configDbEntity);
+    when(userResolver.resolve()).thenReturn(Optional.empty());
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(2);
+    sectorDetails.setNetworkId(0);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setId(5);
+    cellDetails.setRadioSetId(10);
+    cellDetails.setNetworkId(1);
+    when(networkInfoServiceRepository.getSectorDetails(any())).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(anyInt())).thenReturn(cellDetails);
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor =
+        ArgumentCaptor.forClass(SetConfigParams.class);
+    ArgumentCaptor<OperationDbEntity> operationDbEntityArgumentCaptor = ArgumentCaptor
+        .forClass(OperationDbEntity.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationDbRepository.save(any())).thenReturn(new OperationDbEntity());
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    deviceDetails.setType("BN");
+    savedDeviceConfigDetails.setNetworkProfile(0);
+    savedDeviceConfigDetails.setRadioSetId(10);
+    savedDeviceConfigDetails.setRadioCellId(1);
+    savedDeviceConfigDetails.setRadioSectorId(0);
+    savedDeviceConfigDetails.setRadioOperatorId(0);
+    savedDeviceConfigDetails.setMuteMode(false);
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    deviceDetails.setBootId("1");
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(false);
+    Carrier carrier1 = new Carrier();
+    carrier1.setChannelWidth(10);
+    carrier1.setFrequency(20);
+    Carrier carrier2 = new Carrier();
+    carrier2.setChannelWidth(20);
+    carrier2.setFrequency(40);
+    savedDeviceConfigDetails.setCarrier1(carrier1);
+    savedDeviceConfigDetails.setCarrier2(carrier2);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    when(networkInfoServiceRepository.getDeviceDetails(any())).thenReturn(deviceDetails);
+    when(operationResponseMapper.buildOperationResponse(operationDbEntityArgumentCaptor.capture()))
+        .thenReturn(new DeviceConfigOperationResponse());
+    mockConfigPathForDefaults();
+    deviceConfigManager.pushDeviceInitialConfiguration("1", false, true, Context.TCS);
+    Assert.assertEquals(DeviceType.BN, setConfigParamsArgumentCaptor.getValue().getDeviceType());
+    Assert.assertNotNull(operationDbEntityArgumentCaptor.getValue().getOpId());
+    verify(operationDbRepository, times(1)).save(any(OperationDbEntity.class));
+    Assert.assertEquals(1, operationDbEntityArgumentCaptor.getAllValues().size());
+    verify(configDbRepository, times(1)).save(configDbEntity);
+  }
+
+  @Test
+  public void pushDeviceInitialConfigurationForBN_authenticatedDevice_success()
+      throws ResourceNotFoundException, SystemException, ForbiddenAccessException {
+    when(networkInfoServiceRepository.validateEntity(any(), any())).thenReturn(true);
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(new HashMap<>()).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository.getConfigDbEntity(any(), any(), anyString(), any()))
+        .thenReturn(configDbEntity);
+    when(userResolver.resolve()).thenReturn(Optional.empty());
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(2);
+    sectorDetails.setNetworkId(0);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setId(5);
+    cellDetails.setRadioSetId(10);
+    cellDetails.setNetworkId(1);
+    when(networkInfoServiceRepository.getSectorDetails(any())).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(anyInt())).thenReturn(cellDetails);
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor =
+        ArgumentCaptor.forClass(SetConfigParams.class);
+    ArgumentCaptor<OperationDbEntity> operationDbEntityArgumentCaptor = ArgumentCaptor
+        .forClass(OperationDbEntity.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationDbRepository.save(any())).thenReturn(new OperationDbEntity());
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    deviceDetails.setType("BN");
+    savedDeviceConfigDetails.setNetworkProfile(0);
+    savedDeviceConfigDetails.setMuteMode(false);
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    deviceDetails.setBootId("1");
+    deviceDetails.setAuthenticated(true);
+    deviceDetails.setConfigPushEnabled(true);
+    Carrier carrier1 = new Carrier();
+    carrier1.setChannelWidth(10);
+    carrier1.setFrequency(20);
+    Carrier carrier2 = new Carrier();
+    carrier2.setChannelWidth(20);
+    carrier2.setFrequency(40);
+    savedDeviceConfigDetails.setCarrier1(carrier1);
+    savedDeviceConfigDetails.setCarrier2(carrier2);
+    savedDeviceConfigDetails.setRadioOperatorId(1);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    when(networkInfoServiceRepository.getDeviceDetails(any())).thenReturn(deviceDetails);
+    when(operationResponseMapper.buildOperationResponse(operationDbEntityArgumentCaptor.capture()))
+        .thenReturn(new DeviceConfigOperationResponse());
+    mockConfigPathForDefaults();
+    deviceConfigManager.pushDeviceInitialConfiguration("1", false, false, Context.TCS);
+    Assert.assertEquals(DeviceType.BN, setConfigParamsArgumentCaptor.getValue().getDeviceType());
+    Assert.assertNotNull(operationDbEntityArgumentCaptor.getValue().getOpId());
+    verify(operationDbRepository, times(1)).save(any(OperationDbEntity.class));
+    Assert.assertEquals(1, operationDbEntityArgumentCaptor.getAllValues().size());
+    verify(configDbRepository, times(1)).save(configDbEntity);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void pushDeviceInitialConfiguration_invalidDetails_illegalArgumentException()
+      throws ResourceNotFoundException, SystemException, ForbiddenAccessException {
+    deviceConfigManager.pushDeviceInitialConfiguration(null, false, false, Context.TCS);
+  }
+
+  @Test
+  public void pushDeltaDeviceConfiguration_validDeltaConfig_success()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    savedDeviceConfigDetails.setManagementSubnet("10.11.8.0");
+    savedDeviceConfigDetails.setManagementSubnetMask("22");
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    configuration
+        .put(DefaultStartUpConfigConstant.HOSTNAME_YANG_PATH, ConfigDetails.builder().pathValue(
+            PathValue.builder().value("H2").build()).build());
+    configuration
+        .put(TRANSMISSION_ENABLED_YANG_PATH, ConfigDetails.builder().pathValue(
+            PathValue.builder().value(true).valueType(ValueType.BOOLEAN).build()).build());
+    configuration
+        .put(MANAGEMENT_IP_PREFIX_YANG_PATH, ConfigDetails.builder().pathValue(
+            PathValue.builder().value("10.11.9.0/22").valueType(ValueType.STRING).build()).build());
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(configDbEntity);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configDbEntity);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(deviceDetails);
+    ArgumentCaptor<ConfigDbEntity> configDbEntityArgumentCaptor = ArgumentCaptor
+        .forClass(ConfigDbEntity.class);
+    verify(configDbRepository, times(2)).save(configDbEntityArgumentCaptor.capture());
+    verify(workflowClient, times(1)).start(anyString(), any());
+    ConfigDbEntity configDbEntitySaved = configDbEntityArgumentCaptor.getAllValues().get(0);
+    Assert.assertEquals("10.11.8.0/22",
+        configDbEntitySaved.getConfiguration().getConfig().get(MANAGEMENT_IP_PREFIX_YANG_PATH)
+            .getPathValue().getValue());
+  }
+
+  @Test
+  public void getDefaultStartUpConfigSetRequest_validDeviceDetails_successSetRequest() {
+    DeviceDetails deviceDetails = new DeviceDetails();
+    deviceDetails.setAuthenticated(true);
+    deviceDetails.setType(DeviceType.BN.name());
+    SavedDeviceConfigDetails savedConfig = new SavedDeviceConfigDetails();
+    savedConfig.setRadioSectorId(1);
+    savedConfig.setRadioSetId(1);
+    savedConfig.setRadioCellId(0);
+    savedConfig.setHostName("getDefaultHostName");
+    savedConfig.setNetworkProfile(2);
+    savedConfig.setMuteMode(true);
+    savedConfig.setSlaClassificationType("cos-inner");
+    savedConfig.setRadioOperatorId(2);
+    deviceDetails.setSavedConfig(savedConfig);
+
+    List<Carrier> carriers = new ArrayList<>();
+    if (savedConfig.getCarrier1() != null) {
+      carriers.add(savedConfig.getCarrier1());
+    }
+    if (savedConfig.getCarrier2() != null) {
+      carriers.add(savedConfig.getCarrier2());
+    }
+    for (int i = 0; i < carriers.size(); i++) {
+      Carrier carrier = carriers.get(i);
+      carrier.setFrequency(354000);
+      carrier.setChannelWidth(200);
+    }
+    SetDeviceConfigRequest defaultStartUpConfigSetRequest = deviceConfigManager
+        .getDefaultStartUpConfigSetRequest(deviceDetails);
+    Assert.assertNotNull(defaultStartUpConfigSetRequest);
+    System.out.println(defaultStartUpConfigSetRequest.getConfig());
+    Assert
+        .assertEquals(false, defaultStartUpConfigSetRequest.getConfig().get(TRANSMISSION_ENABLED));
+    Assert.assertEquals("getDefaultHostName",
+        defaultStartUpConfigSetRequest.getConfig().get(HOSTNAME));
+    Assert.assertEquals(2, defaultStartUpConfigSetRequest.getConfig().get(RADIO_OPERATOR_ID));
+    Assert
+        .assertEquals("cos-inner", defaultStartUpConfigSetRequest.getConfig().get(CLASSIFIER_TYPE));
+    Assert.assertEquals(2, defaultStartUpConfigSetRequest.getConfig().get(NETWORK_PROFILE));
+  }
+
+  @Test
+  public void getDefaultStartUpConfigSetRequestForRN_validDeviceDetails_successSetRequest() {
+    DeviceDetails deviceDetails = new DeviceDetails();
+    deviceDetails.setAuthenticated(true);
+    deviceDetails.setType(DeviceType.RN.name());
+    deviceDetails.setSerialNumber("2");
+    SavedDeviceConfigDetails savedConfig = new SavedDeviceConfigDetails();
+    savedConfig.setRadioSectorId(1);
+    savedConfig.setRadioSetId(1);
+    savedConfig.setRadioCellId(0);
+    savedConfig.setHostName("getDefaultHostName");
+    savedConfig.setSlaProfile("gold");
+    savedConfig.setLatitude(10.2);
+    savedConfig.setLongitude(12.5);
+    savedConfig.setNetworkProfile(2);
+    savedConfig.setMuteMode(true);
+    savedConfig.setSlaClassificationType("cos-inner");
+    savedConfig.setRadioOperatorId(2);
+    savedConfig.setDataVlan(100);
+    deviceDetails.setSavedConfig(savedConfig);
+
+    SetDeviceConfigRequest defaultStartUpConfigSetRequest = deviceConfigManager
+        .getDefaultStartUpConfigSetRequest(deviceDetails);
+    Assert.assertNotNull(defaultStartUpConfigSetRequest);
+    Assert.assertEquals("getDefaultHostName",
+        defaultStartUpConfigSetRequest.getConfigWithDetails()
+            .get(HOSTNAME_YANG_PATH).getPathValue().getValue());
+    Assert.assertEquals(10.2d,
+        defaultStartUpConfigSetRequest.getConfigWithDetails()
+            .get(LATITUDE_YANG_PATH).getPathValue().getValue());
+    Assert.assertEquals(12.5d,
+        defaultStartUpConfigSetRequest.getConfigWithDetails()
+            .get(LONGITUDE_YANG_PATH).getPathValue().getValue());
+    Assert.assertEquals(100,
+        defaultStartUpConfigSetRequest.getConfigWithDetails()
+            .get(DefaultStartUpConfigConstant.getDataVlanYangPath("2")).getPathValue().getValue());
+    Assert.assertEquals("gold",
+        defaultStartUpConfigSetRequest.getConfigWithDetails()
+            .get(getSlaProfileYangPath("2")).getPathValue().getValue());
+  }
+
+  @Test
+  public void pushDeviceInitialConfigurationSkipBootIdCheck_emptyCurrentConfig_successPushInitial()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(false);
+    savedDeviceConfigDetails.setManagementSubnet(null);
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setBootId("1");
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(configDbEntity);
+    DeviceInitialConfigStateEntity deviceInitialConfigStateEntity = DeviceInitialConfigStateEntity
+        .builder()
+        .initialConfigBootId("0").build();
+    when(deviceInitialConfigStateDbRepository.findById(anyString()))
+        .thenReturn(Optional.of(deviceInitialConfigStateEntity));
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configDbEntity);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    ArgumentCaptor<ConfigDbEntity> configDbEntityArgumentCaptor = ArgumentCaptor
+        .forClass(ConfigDbEntity.class);
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeviceInitialConfiguration("1", true, true, Context.TCS);
+    verify(configDbRepository, times(1)).save(configDbEntityArgumentCaptor.capture());
+    verify(workflowClient, times(1)).start(anyString(), any());
+    ConfigDbEntity configDbEntitySaved = configDbEntityArgumentCaptor.getValue();
+    Assert.assertFalse(configDbEntitySaved.getConfiguration().getConfig()
+        .containsKey(MANAGEMENT_IP_PREFIX_YANG_PATH));
+  }
+
+  @Test
+  public void pushDeltaDeviceConfiguration_emptyCurrentConfig_successPushInitial()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setBootId("1");
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(configDbEntity);
+    DeviceInitialConfigStateEntity deviceInitialConfigStateEntity = DeviceInitialConfigStateEntity
+        .builder()
+        .initialConfigBootId("0").build();
+    when(deviceInitialConfigStateDbRepository.findById(anyString()))
+        .thenReturn(Optional.of(deviceInitialConfigStateEntity));
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configDbEntity);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(deviceDetails);
+    verify(configDbRepository, times(1)).save(any());
+    verify(workflowClient, times(1)).start(anyString(), any());
+  }
+
+  @Test
+  public void pushDeltaDeviceConfiguration_nullCurrentConfig_successPushInitial()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setBootId("1");
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(null);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(null);
+    DeviceInitialConfigStateEntity deviceInitialConfigStateEntity = DeviceInitialConfigStateEntity
+        .builder()
+        .initialConfigBootId("0").build();
+    when(deviceInitialConfigStateDbRepository.findById(anyString()))
+        .thenReturn(Optional.of(deviceInitialConfigStateEntity));
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(deviceDetails);
+    verify(workflowClient, times(1)).start(anyString(), any());
+  }
+
+  @Test
+  public void pushDeltaDeviceConfiguration_rnDevice_successPushInitial()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    deviceDetails.setId("1");
+    deviceDetails.setType("RN");
+    deviceDetails.setSerialNumber("rnSerial");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setConfigPushEnabled(true);
+    SavedDeviceConfigDetails savedConfig = new SavedDeviceConfigDetails();
+    savedConfig.setSlaProfile("gold");
+    savedConfig.setHostName("h1");
+    savedConfig.setLatitude(10.2);
+    savedConfig.setLongitude(12.0);
+    savedConfig.setDataVlan(102);
+    savedConfig.setAntennaAzimuth(15.6d);
+    deviceDetails.setSavedConfig(savedConfig);
+    mockConfigPathForDefaults();
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    Map<String, ConfigDetails> configMap = new HashMap<>();
+    configMap.put(LONGITUDE_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value(0.0).valueType(ValueType.FLOAT).build()).build());
+    configMap.put(LATITUDE_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value(0.0).valueType(ValueType.FLOAT).build()).build());
+    configMap.put(HOSTNAME_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value("1").valueType(ValueType.STRING).build()).build());
+    configMap.put(AZIMUTH_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value(15.8d).valueType(ValueType.FLOAT).build()).build());
+    configMap.put(DefaultStartUpConfigConstant.getDataVlanYangPath("rnSerial"),
+        ConfigDetails.builder().pathValue(PathValue.builder().
+            value(101).valueType(ValueType.INT).build()).build());
+    Configuration configuration = Configuration.builder()
+        .config(configMap)
+        .build();
+    ConfigDbEntity currentConfig = ConfigDbEntity.builder()
+        .configuration(configuration)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, deviceDetails.getId(), STARTUP_CONFIG_VERSION))
+        .thenReturn(currentConfig);
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(deviceDetails);
+    ArgumentCaptor<ConfigDbEntity> configDbEntityArgumentCaptor = ArgumentCaptor
+        .forClass(ConfigDbEntity.class);
+    verify(configDbRepository, times(2)).save(configDbEntityArgumentCaptor.capture());
+    Assert.assertNotNull(deviceConfigOperationResponse);
+    Assert.assertNotNull(configDbEntityArgumentCaptor.getValue());
+    ConfigDbEntity configDbEntityval = configDbEntityArgumentCaptor.getValue();
+    Set<String> configKeys = configDbEntityval.getConfiguration().getConfig().keySet();
+    Assert.assertEquals(6, configKeys.size());
+  }
+
+  @Test
+  public void pushDeltaDeviceConfiguration_rnDeviceDefaultValues_noConfigPushed()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    deviceDetails.setId("1");
+    deviceDetails.setType("RN");
+    deviceDetails.setSerialNumber("rnSerial");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setConfigPushEnabled(true);
+    SavedDeviceConfigDetails savedConfig = new SavedDeviceConfigDetails();
+    savedConfig.setSlaProfile("");
+    savedConfig.setHostName(null);
+    savedConfig.setLatitude(0.0);
+    savedConfig.setLongitude(0.0);
+    savedConfig.setAntennaAzimuth(-1.0d);
+    savedConfig.setDataVlan(0);
+    deviceDetails.setSavedConfig(savedConfig);
+    mockConfigPathForDefaults();
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    Map<String, ConfigDetails> configMap = new HashMap<>();
+    configMap.put(LONGITUDE_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value(1.0).valueType(ValueType.FLOAT).build()).build());
+    configMap.put(LATITUDE_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value(2.0).valueType(ValueType.FLOAT).build()).build());
+    configMap.put(HOSTNAME_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value("12121").valueType(ValueType.STRING).build()).build());
+    configMap.put(getDataVlanYangPath("rnSerial"), ConfigDetails.builder()
+        .pathValue(PathValue.builder().value(0).valueType(ValueType.INT).build()).build());
+    Configuration configuration = Configuration.builder()
+        .config(configMap)
+        .build();
+    ConfigDbEntity currentConfig = ConfigDbEntity.builder()
+        .configuration(configuration)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, deviceDetails.getId(), STARTUP_CONFIG_VERSION))
+        .thenReturn(currentConfig);
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(deviceDetails);
+    ArgumentCaptor<ConfigDbEntity> configDbEntityArgumentCaptor = ArgumentCaptor
+        .forClass(ConfigDbEntity.class);
+    verify(configDbRepository, times(0)).save(configDbEntityArgumentCaptor.capture());
+    verify(workflowClient, times(0)).start(anyString(), any());
+    Assert.assertNull(deviceConfigOperationResponse);
+  }
+
+  @Test
+  public void pushDeltaDeviceConfiguration_rnDeviceHalfConfiguredValues_deltaConfigPush()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    deviceDetails.setId("1");
+    deviceDetails.setType("RN");
+    deviceDetails.setSerialNumber("rnSerial");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setConfigPushEnabled(true);
+    SavedDeviceConfigDetails savedConfig = new SavedDeviceConfigDetails();
+    savedConfig.setSlaProfile("sla-30");
+    savedConfig.setHostName("h1");
+    savedConfig.setLatitude(2.5);
+    savedConfig.setLongitude(0.0);
+    deviceDetails.setSavedConfig(savedConfig);
+    mockConfigPathForDefaults();
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    Map<String, ConfigDetails> configMap = new HashMap<>();
+    configMap.put(SLA_PROFILE, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value("sla-25").valueType(ValueType.STRING).build())
+        .build());
+    Configuration configuration = Configuration.builder()
+        .config(configMap)
+        .build();
+    ConfigDbEntity currentConfig = ConfigDbEntity.builder()
+        .configuration(configuration)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, deviceDetails.getId(), STARTUP_CONFIG_VERSION))
+        .thenReturn(currentConfig);
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    when(defaultStartupWhitelistConfig.isConfigWhiteListed(SLA_PROFILE, DeviceType.RN.name()))
+        .thenReturn(false);
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(deviceDetails);
+    ArgumentCaptor<ConfigDbEntity> configDbEntityArgumentCaptor = ArgumentCaptor
+        .forClass(ConfigDbEntity.class);
+    verify(configDbRepository, times(2)).save(configDbEntityArgumentCaptor.capture());
+    verify(workflowClient, times(1)).start(anyString(), any());
+    Assert.assertNotNull(deviceConfigOperationResponse);
+    Configuration configurationSaved = configDbEntityArgumentCaptor.getAllValues().get(0)
+        .getConfiguration();
+    Assert.assertNotNull(configurationSaved);
+    Assert.assertTrue(configurationSaved.getConfig().containsKey("/system/config/hostname"));
+    Assert
+        .assertFalse(configurationSaved.getConfig().containsKey(getSlaProfileYangPath("rnSerial")));
+    Assert.assertEquals("h1",
+        configurationSaved.getConfig().get("/system/config/hostname").getPathValue().getValue());
+    Assert.assertEquals(2.5,
+        configurationSaved.getConfig().get("/system/install/config/latitude").getPathValue()
+            .getValue());
+    Assert.assertEquals(0.0,
+        configurationSaved.getConfig().get("/system/install/config/longitude").getPathValue()
+            .getValue());
+  }
+
+  @Test
+  public void pushDeltaSectorConfiguration_validDeltaConfig_success()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    savedDeviceConfigDetails.setRadioSetId(4);
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+
+    List<DeviceDetails> sectorDevices = new ArrayList<>();
+    sectorDevices.add(deviceDetails);
+    when(networkInfoServiceRepository.getSectorDevices(2, "BN"))
+        .thenReturn(sectorDevices);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    configuration
+        .put(DefaultStartUpConfigConstant.SECTOR_ID_YANG_PATH, ConfigDetails.builder().pathValue(
+            PathValue.builder().value(3).valueType(ValueType.INT).build()).build());
+    configuration
+        .put(SET_ID_YANG_PATH, ConfigDetails.builder().pathValue(
+            PathValue.builder().value(null).valueType(ValueType.INT).build()).build());
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configDbEntity);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION)).thenReturn(configDbEntity);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    ArgumentCaptor<ConfigDbEntity> configDbEntityArgumentCaptor = ArgumentCaptor
+        .forClass(ConfigDbEntity.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    deviceConfigManager.pushDeltaConfiguration(sectorDetails);
+    verify(configDbRepository, times(2)).save(configDbEntityArgumentCaptor.capture());
+    verify(workflowClient, times(1)).start(anyString(), any());
+    ConfigDbEntity configDbEntitySaved = configDbEntityArgumentCaptor.getAllValues().get(0);
+    Assert.assertEquals(4,
+        configDbEntitySaved.getConfiguration().getConfig().get(SET_ID_YANG_PATH).getPathValue()
+            .getValue());
+  }
+
+  @Test
+  public void pushDeltaSectorConfiguration_noCurrentConfig_pushDeltaSetConfig()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setConfigPushEnabled(true);
+    deviceDetails.setAuthenticated(true);
+    List<DeviceDetails> sectorDevices = new ArrayList<>();
+    sectorDevices.add(deviceDetails);
+    when(networkInfoServiceRepository.getSectorDevices(2, "BN"))
+        .thenReturn(sectorDevices);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    savedDeviceConfigDetails.setHostName("h1");
+    savedDeviceConfigDetails.setRadioOperatorId(1);
+    savedDeviceConfigDetails.setBand("1");
+    savedDeviceConfigDetails.setRadioSetId(1);
+    savedDeviceConfigDetails.setRadioCellId(1);
+    savedDeviceConfigDetails.setRadioSectorId(1);
+    savedDeviceConfigDetails.setNetworkProfile(1);
+    savedDeviceConfigDetails.setMuteMode(false);
+    savedDeviceConfigDetails.setSlaProfile("gold");
+    savedDeviceConfigDetails.setSlaClassificationType("1");
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    configuration.put(DefaultStartUpConfigConstant.SECTOR_ID_YANG_PATH,
+        ConfigDetails.builder().pathValue(PathValue.builder().value(1).build()).build());
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(configDbEntity);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configDbEntity);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(sectorDetails);
+    Assert.assertNotNull(deviceConfigOperationResponse);
+    verify(configDbRepository, times(2)).save(any());
+    verify(workflowClient, times(1)).start(anyString(), any());
+  }
+
+  @Test
+  public void pushDeltaSectorConfiguration_emptyCurrentConfig_skipSetConfig()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setBootId("1");
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+    List<DeviceDetails> sectorDevices = new ArrayList<>();
+    sectorDevices.add(deviceDetails);
+    when(networkInfoServiceRepository.getSectorDevices(2, "BN"))
+        .thenReturn(sectorDevices);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(configDbEntity);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configDbEntity);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(sectorDetails);
+    Assert.assertNotNull(deviceConfigOperationResponse);
+    verify(configDbRepository, times(1)).save(any());
+    verify(workflowClient, times(1)).start(anyString(), any());
+  }
+
+  @Test
+  public void pushDeltaSectorConfiguration_incorrectDeltaConfig_skipSetConfig()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(1);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(1);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    savedDeviceConfigDetails.setRadioCellId(1);
+    savedDeviceConfigDetails.setHostName("h1");
+    savedDeviceConfigDetails.setRadioSetId(1);
+    savedDeviceConfigDetails.setManagementSubnetMask("22");
+    savedDeviceConfigDetails.setManagementSubnet("10.0.0.0");
+    savedDeviceConfigDetails.setNetworkProfile(1);
+    savedDeviceConfigDetails.setSlaClassificationType("cos-inner");
+    savedDeviceConfigDetails.setRadioOperatorId(1);
+    savedDeviceConfigDetails.setRadioSectorId(1);
+    savedDeviceConfigDetails.setAntennaAzimuth(-1.0d);
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(true);
+    deviceDetails.setConfigPushEnabled(true);
+    List<DeviceDetails> sectorDevices = new ArrayList<>();
+    sectorDevices.add(deviceDetails);
+    when(networkInfoServiceRepository.getSectorDevices(2, "BN"))
+        .thenReturn(sectorDevices);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    configuration.put(MANAGEMENT_IP_PREFIX_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("10.0.0.0/22").build())
+            .build());
+    configuration.put(RADIO_OPERATOR_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(NETWORK_PROFILE_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(HOSTNAME_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("h1").build())
+            .build());
+    configuration.put(CLASSIFIER_TYPE_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("cos-inner").build())
+            .build());
+    configuration.put(SET_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(SECTOR_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(CELL_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(TRANSMISSION_ENABLED_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.BOOLEAN).value(false).build())
+            .build());
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(configDbEntity);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configDbEntity);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(sectorDetails);
+    verify(configDbRepository, times(0)).save(any());
+    verify(workflowClient, times(0)).start(anyString(), any());
+  }
+
+
+  @Test
+  public void pushDeltaSectorConfiguration_noCurrentConfig_pushInitialConfiguration()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(false);
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    deviceDetails.setBootId("1");
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+    List<DeviceDetails> sectorDevices = new ArrayList<>();
+    sectorDevices.add(deviceDetails);
+    when(networkInfoServiceRepository.getSectorDevices(2, "BN"))
+        .thenReturn(sectorDevices);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(null);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(null);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(sectorDetails);
+    Assert.assertNotNull(deviceConfigOperationResponse);
+    verify(configDbRepository, times(1)).save(any());
+    verify(workflowClient, times(1)).start(anyString(), any());
+  }
+
+  @Test
+  public void pushDeltaSectorConfiguration_validDeltaConfigNoSectorDevices_success()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    List<DeviceDetails> sectorDevices = new ArrayList<>();
+    when(networkInfoServiceRepository.getSectorDevices(2, "BN"))
+        .thenReturn(sectorDevices);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    DeviceConfigOperationResponse deviceConfigOperationResponse = deviceConfigManager
+        .pushDeltaConfiguration(sectorDetails);
+    Assert.assertNull(deviceConfigOperationResponse);
+    verify(configDbRepository, times(0)).save(any());
+    verify(workflowClient, times(0)).start(anyString(), any());
+  }
+
+  @Test
+  public void pushDeltaCellConfiguration_validDeltaConfig_success()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+    List<DeviceDetails> cellDevices = new ArrayList<>();
+    cellDevices.add(deviceDetails);
+    when(networkInfoServiceRepository.getCellDevices(3, "BN"))
+        .thenReturn(cellDevices);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    configuration.put(DefaultStartUpConfigConstant.CELL_ID_YANG_PATH,
+        ConfigDetails.builder().pathValue(PathValue.builder().value(3).build()).build());
+    configuration.put(DefaultStartUpConfigConstant.SET_ID_YANG_PATH,
+        ConfigDetails.builder().pathValue(PathValue.builder().value(4).build()).build());
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(configDbEntity);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configDbEntity);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    List<DeviceConfigOperationResponse> deviceConfigOperationResponses = deviceConfigManager
+        .pushDeltaConfiguration(cellDetails);
+    Assert.assertEquals(1, deviceConfigOperationResponses.size());
+    verify(configDbRepository, times(2)).save(any());
+    verify(workflowClient, times(1)).start(anyString(), any());
+  }
+
+  @Test
+  public void pushDeltaCellConfiguration_invalidCurrentConfig_success()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setConfigPushEnabled(true);
+    savedDeviceConfigDetails.setAntennaAzimuth(-1.0d);
+    deviceDetails.setAuthenticated(false);
+    List<DeviceDetails> cellDevices = new ArrayList<>();
+    cellDevices.add(deviceDetails);
+    when(networkInfoServiceRepository.getCellDevices(3, "BN"))
+        .thenReturn(cellDevices);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    savedDeviceConfigDetails.setHostName("h1");
+    savedDeviceConfigDetails.setRadioOperatorId(1);
+    savedDeviceConfigDetails.setBand("1");
+    savedDeviceConfigDetails.setRadioSetId(1);
+    savedDeviceConfigDetails.setRadioCellId(1);
+    savedDeviceConfigDetails.setRadioSectorId(1);
+    savedDeviceConfigDetails.setNetworkProfile(1);
+    savedDeviceConfigDetails.setMuteMode(false);
+    savedDeviceConfigDetails.setSlaProfile("gold");
+    savedDeviceConfigDetails.setManagementSubnet("10.0.0.0");
+    savedDeviceConfigDetails.setManagementSubnetMask("22");
+    savedDeviceConfigDetails.setSlaClassificationType("cos-inner");
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    configuration.put(DefaultStartUpConfigConstant.SECTOR_ID_YANG_PATH,
+        ConfigDetails.builder().pathValue(PathValue.builder().value(1).build()).build());
+    configuration.put(MANAGEMENT_IP_PREFIX_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("10.0.0.0/22").build())
+            .build());
+    configuration.put(RADIO_OPERATOR_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(NETWORK_PROFILE_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(HOSTNAME_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("h1").build())
+            .build());
+    configuration.put(CLASSIFIER_TYPE_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("cos-inner").build())
+            .build());
+    configuration.put(SET_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(CELL_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(TRANSMISSION_ENABLED_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.BOOLEAN).value(true).build())
+            .build());
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(configDbEntity);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configDbEntity);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    List<DeviceConfigOperationResponse> deviceConfigOperationResponses = deviceConfigManager
+        .pushDeltaConfiguration(cellDetails);
+    Assert.assertEquals(0, deviceConfigOperationResponses.size());
+    verify(configDbRepository, times(0)).save(any());
+    verify(workflowClient, times(0)).start(anyString(), any());
+  }
+
+  @Test
+  public void pushDeltaCellConfiguration_noDeltaConfig_success()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setRadioCellId(1);
+    savedDeviceConfigDetails.setHostName("h1");
+    savedDeviceConfigDetails.setRadioSetId(13);
+    savedDeviceConfigDetails.setRadioSectorId(1);
+    savedDeviceConfigDetails.setMuteMode(true);
+    savedDeviceConfigDetails.setManagementSubnet("10.0.0.0");
+    savedDeviceConfigDetails.setManagementSubnetMask("22");
+    savedDeviceConfigDetails.setNetworkProfile(1);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(true);
+    savedDeviceConfigDetails.setRadioOperatorId(1);
+    savedDeviceConfigDetails.setAntennaAzimuth(30.0d);
+    savedDeviceConfigDetails.setSlaClassificationType("cos-inner");
+    deviceDetails.setConfigPushEnabled(true);
+    List<DeviceDetails> cellDevices = new ArrayList<>();
+    cellDevices.add(deviceDetails);
+    when(networkInfoServiceRepository.getCellDevices(3, "BN"))
+        .thenReturn(cellDevices);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    configuration.put(DefaultStartUpConfigConstant.CELL_ID_YANG_PATH,
+        ConfigDetails.builder().pathValue(PathValue.builder().value(1).build()).build());
+    configuration.put(DefaultStartUpConfigConstant.SET_ID_YANG_PATH,
+        ConfigDetails.builder().pathValue(PathValue.builder().value(13).build()).build());
+    configuration.put(MANAGEMENT_IP_PREFIX_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("10.0.0.0/22").build())
+            .build());
+    configuration.put(CLASSIFIER_TYPE_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("cos-inner").build())
+            .build());
+    configuration.put(HOSTNAME_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("h1").build())
+            .build());
+    configuration.put(NETWORK_PROFILE_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(CLASSIFIER_TYPE_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("cos-inner").build())
+            .build());
+    configuration.put(CELL_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(AZIMUTH_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.FLOAT).value(30.0d).build())
+            .build());
+    configuration.put(RADIO_OPERATOR_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(SECTOR_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    configuration.put(TRANSMISSION_ENABLED_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.BOOLEAN).value(false).build())
+            .build());
+    ConfigDbEntity configurationDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(configurationDbEntity);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configurationDbEntity);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    List<DeviceConfigOperationResponse> deviceConfigOperationResponses = deviceConfigManager
+        .pushDeltaConfiguration(cellDetails);
+    Assert.assertEquals(0, deviceConfigOperationResponses.size());
+    verify(configDbRepository, times(0)).save(any());
+    verify(workflowClient, times(0)).start(anyString(), any());
+  }
+
+  @Test
+  public void pushDeltaCellConfiguration_emptyCurrentConfig_pushInitialConfig()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setBootId("1");
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    List<DeviceDetails> cellDevices = new ArrayList<>();
+    cellDevices.add(deviceDetails);
+    HashMap<String, ConfigDetails> configuration = new HashMap<>();
+    ConfigDbEntity configDbEntity = ConfigDbEntity.builder()
+        .configId(ConfigId.builder().version(STARTUP_CONFIG_VERSION).entityId("1").build())
+        .deviceType(DeviceType.BN)
+        .configuration(Configuration.builder().config(configuration).build())
+        .configLevel(EntityType.DEVICE)
+        .build();
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(configDbEntity);
+    DeviceInitialConfigStateEntity deviceInitialConfigStateEntity = DeviceInitialConfigStateEntity
+        .builder()
+        .initialConfigBootId("0").build();
+    when(deviceInitialConfigStateDbRepository.findById(anyString()))
+        .thenReturn(Optional.of(deviceInitialConfigStateEntity));
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(configDbEntity);
+    when(networkInfoServiceRepository.getCellDevices(3, "BN"))
+        .thenReturn(cellDevices);
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    List<DeviceConfigOperationResponse> deviceConfigOperationResponses = deviceConfigManager
+        .pushDeltaConfiguration(cellDetails);
+    Assert.assertEquals(1, deviceConfigOperationResponses.size());
+    verify(configDbRepository, times(1)).save(any());
+    verify(workflowClient, times(1)).start(anyString(), any());
+  }
+
+  @Test
+  public void pushDeltaCellConfiguration_noCurrentConfig_pushInitialConfig()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setBootId("0");
+    deviceDetails.setConnected(true);
+    deviceDetails.setAuthenticated(false);
+    deviceDetails.setConfigPushEnabled(true);
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    List<DeviceDetails> cellDevices = new ArrayList<>();
+    cellDevices.add(deviceDetails);
+    when(networkInfoServiceRepository.getCellDevices(3, "BN"))
+        .thenReturn(cellDevices);
+    DeviceInitialConfigStateEntity deviceInitialConfigStateEntity = DeviceInitialConfigStateEntity
+        .builder()
+        .initialConfigBootId("1").build();
+    when(deviceInitialConfigStateDbRepository.findById(anyString()))
+        .thenReturn(Optional.of(deviceInitialConfigStateEntity));
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(null);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(null);
+    mockConfigPathForDefaults();
+    ArgumentCaptor<SetConfigParams> setConfigParamsArgumentCaptor = ArgumentCaptor
+        .forClass(SetConfigParams.class);
+    ArgumentCaptor<OperationDbEntity> setConfigOperatorArgumentCaptor = ArgumentCaptor
+        .forClass(OperationDbEntity.class);
+    doNothing().when(workflowClient).start(anyString(), setConfigParamsArgumentCaptor.capture());
+    when(operationResponseMapper.buildOperationResponse(setConfigOperatorArgumentCaptor.capture()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    List<DeviceConfigOperationResponse> deviceConfigOperationResponses = deviceConfigManager
+        .pushDeltaConfiguration(cellDetails);
+    Assert.assertEquals(1, deviceConfigOperationResponses.size());
+    verify(configDbRepository, times(1)).save(any());
+    verify(workflowClient, times(1)).start(anyString(), any());
+    String entityVersionSetConfigRequest = setConfigParamsArgumentCaptor.getValue()
+        .getEntityVersion();
+    String entityVersionOperation = setConfigOperatorArgumentCaptor.getValue().getEntityVersion();
+    Assert.assertEquals(entityVersionSetConfigRequest, entityVersionOperation);
+  }
+
+  @Test
+  public void pushDeltaCellConfiguration_noCurrentConfigSameBootId_noPushInitialConfig()
+      throws ForbiddenAccessException, ResourceNotFoundException, SystemException {
+    SectorDetails sectorDetails = new SectorDetails();
+    sectorDetails.setCellId(3);
+    sectorDetails.setNetworkId(1);
+    sectorDetails.setId(2);
+    CellDetails cellDetails = new CellDetails();
+    cellDetails.setRadioSetId(13);
+    cellDetails.setNetworkId(1);
+    cellDetails.setId(3);
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    deviceDetails.setId("1");
+    deviceDetails.setType("BN");
+    deviceDetails.setHostName("H1");
+    deviceDetails.setSectorId(2);
+    deviceDetails.setBootId("0");
+    deviceDetails.setConnected(true);
+    deviceDetails.setReachable(DefaultStartUpConfigManager.REACHABLE_TRUE);
+    List<DeviceDetails> cellDevices = new ArrayList<>();
+    cellDevices.add(deviceDetails);
+    when(networkInfoServiceRepository.getCellDevices(3, "BN"))
+        .thenReturn(cellDevices);
+    DeviceInitialConfigStateEntity deviceInitialConfigStateEntity = DeviceInitialConfigStateEntity
+        .builder()
+        .initialConfigBootId("0").build();
+    when(deviceInitialConfigStateDbRepository.findById(anyString()))
+        .thenReturn(Optional.of(deviceInitialConfigStateEntity));
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    when(networkInfoServiceRepository.getSectorDetails(2)).thenReturn(sectorDetails);
+    when(networkInfoServiceRepository.getCellDetails(3)).thenReturn(cellDetails);
+    when(networkInfoServiceRepository.getDeviceDetails("1")).thenReturn(deviceDetails);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION))
+        .thenReturn(null);
+    when(configDbRepository
+        .getConfigDbEntity(EntityType.DEVICE, "1",
+            STARTUP_CONFIG_VERSION,
+            DeviceType.BN)).thenReturn(null);
+    mockConfigPathForDefaults();
+    when(operationResponseMapper.buildOperationResponse(any()))
+        .thenReturn(DeviceConfigOperationResponse.builder().build());
+    List<DeviceConfigOperationResponse> deviceConfigOperationResponses = deviceConfigManager
+        .pushDeltaConfiguration(cellDetails);
+    Assert.assertEquals(0, deviceConfigOperationResponses.size());
+    verify(configDbRepository, times(0)).save(any());
+    verify(workflowClient, times(0)).start(anyString(), any());
+  }
+
+  @Test
+  public void findDeltaDeviceConfig_emptyCurrentConfigAllAttribute_success()
+      throws ResourceNotFoundException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    savedDeviceConfigDetails.setAntennaAzimuth(12.0d);
+    mockConfigPathForDefaults();
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    ConfigDbEntity currentConfig = ConfigDbEntity.builder()
+        .configuration(Configuration.builder().config(new HashMap<>()).build()).build();
+    ConfigDbEntity deltaDeviceConfig = deviceConfigManager
+        .findDeltaDeviceConfig(currentConfig, deviceDetails);
+    Assert.assertNotNull(deltaDeviceConfig);
+    Assert.assertEquals(9, deltaDeviceConfig.getConfiguration().getConfig().size());
+  }
+
+  @Test
+  public void removeBootState_validDeviceId_success() {
+    deviceConfigManager.removeDeviceBootState("1");
+    verify(deviceInitialConfigStateDbRepository, times(1)).deleteById("1");
+  }
+
+  @Test
+  public void removeBootState_validDeviceIdExceptionCleanup_exception() {
+    doThrow(new RuntimeException("Exception cleaning up entity"))
+        .when(deviceInitialConfigStateDbRepository).deleteById("1");
+    deviceConfigManager.removeDeviceBootState("1");
+    verify(deviceInitialConfigStateDbRepository, times(1)).deleteById("1");
+  }
+
+  @Test
+  public void removeInitialConfig_validDeviceId_success() {
+    deviceConfigManager.removeDeviceInitialConfig("1");
+    ArgumentCaptor<ConfigId> configIdCapture = ArgumentCaptor.forClass(ConfigId.class);
+    verify(configDbRepository, times(1)).deleteById(configIdCapture.capture());
+    doThrow(new RuntimeException("Exception cleaning up entity"))
+        .when(configDbRepository).deleteById(any());
+    Assert.assertEquals(STARTUP_CONFIG_VERSION, configIdCapture.getValue().getVersion());
+    Assert.assertEquals("1", configIdCapture.getValue().getEntityId());
+  }
+
+  @Test
+  public void removeInitialConfig_validDeviceIdExceptionCleanup_exception() {
+    doThrow(new RuntimeException("Exception cleaning up entity"))
+        .when(deviceInitialConfigStateDbRepository).deleteById("1");
+    deviceConfigManager.removeDeviceBootState("1");
+    verify(deviceInitialConfigStateDbRepository, times(1)).deleteById("1");
+  }
+
+  @Test
+  public void findDeltaDeviceConfig_deltaConfigAllAttributeSameValues_success()
+      throws ResourceNotFoundException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setHostName("H1");
+    savedDeviceConfigDetails.setNetworkProfile(1);
+    savedDeviceConfigDetails.setMuteMode(true);
+    deviceDetails.setConnected(true);
+    mockConfigPathForDefaults();
+    Carrier carrier1 = new Carrier();
+    carrier1.setFrequency(500);
+    carrier1.setChannelWidth(1000);
+    Carrier carrier2 = new Carrier();
+    carrier2.setFrequency(501);
+    carrier2.setChannelWidth(1001);
+    savedDeviceConfigDetails.setCarrier1(carrier1);
+    savedDeviceConfigDetails.setCarrier2(carrier2);
+    savedDeviceConfigDetails.setRadioOperatorId(1);
+    savedDeviceConfigDetails.setRadioSetId(1);
+    savedDeviceConfigDetails.setRadioSectorId(1);
+    savedDeviceConfigDetails.setRadioCellId(1);
+    savedDeviceConfigDetails.setManagementSubnet("10.0.0.0");
+    savedDeviceConfigDetails.setManagementSubnetMask("22");
+    savedDeviceConfigDetails.setSlaClassificationType("cos-inner");
+    savedDeviceConfigDetails.setAntennaAzimuth(15.3d);
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    HashMap<String, ConfigDetails> config = new HashMap<>();
+    config.put(DefaultStartUpConfigConstant.HOSTNAME_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value("H1").build()).build());
+    config.put(DefaultStartUpConfigConstant.NETWORK_PROFILE_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value(1).build()).build());
+    config.put(DefaultStartUpConfigConstant.getRadioOperatorIdConfigPath().getYangPath(),
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().value(1).build()).build());
+    config.put(MANAGEMENT_IP_PREFIX_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("10.0.0.0/22").build())
+            .build());
+    config.put(CLASSIFIER_TYPE_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("cos-inner").build())
+            .build());
+    config.put(SET_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    config.put(CELL_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    config.put(SECTOR_ID_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.UINT).value(1).build())
+            .build());
+    config.put(AZIMUTH_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.FLOAT).value(15.3d).build())
+            .build());
+    config.put(TRANSMISSION_ENABLED_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.BOOLEAN).value(false).build())
+            .build());
+    for (int i = 0; i < 2; i++) {
+      config.put(DefaultStartUpConfigConstant.getRadioFrequencyConfigPath(i).getYangPath(),
+          ConfigDetails.builder()
+              .pathValue(PathValue.builder().value(i + 500).build()).build());
+      config.put(DefaultStartUpConfigConstant.getRadioChannelWidthConfigPath(i).getYangPath(),
+          ConfigDetails.builder()
+              .pathValue(PathValue.builder().value(i + 1000).build()).build());
+    }
+
+    ConfigDbEntity currentConfig = ConfigDbEntity.builder()
+        .configuration(Configuration.builder().config(config).build()).build();
+    ConfigDbEntity deltaDeviceConfig = deviceConfigManager
+        .findDeltaDeviceConfig(currentConfig, deviceDetails);
+    Assert.assertEquals(0, deltaDeviceConfig.getConfiguration().getConfig().size());
+  }
+
+  @Test
+  public void findDeltaDeviceConfigRN_deltaConfigAllAttributeDifferentValues_success()
+      throws ResourceNotFoundException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setHostName("H1");
+    savedDeviceConfigDetails.setNetworkProfile(1);
+    savedDeviceConfigDetails.setMuteMode(true);
+    savedDeviceConfigDetails.setHostName("h1RN");
+    savedDeviceConfigDetails.setSlaProfile("gold-saved");
+    savedDeviceConfigDetails.setDataVlan(1);
+    deviceDetails.setConnected(true);
+    deviceDetails.setSerialNumber("1");
+    savedDeviceConfigDetails.setLatitude(10.2d);
+    savedDeviceConfigDetails.setLongitude(12.09d);
+    savedDeviceConfigDetails.setAntennaAzimuth(20.0d);
+    mockConfigPathForDefaults();
+    deviceDetails.setSavedConfig(savedDeviceConfigDetails);
+    deviceDetails.setType(DeviceType.RN.name());
+    HashMap<String, ConfigDetails> config = new HashMap<>();
+    config.put(HOSTNAME_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("h1").build())
+            .build());
+    config.put(getSlaProfileYangPath("1"),
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.STRING).value("silver").build())
+            .build());
+    config.put(LATITUDE_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.FLOAT).value(1.1d).build())
+            .build());
+    config.put(AZIMUTH_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.FLOAT).value(1.0d).build())
+            .build());
+    config.put(LONGITUDE_YANG_PATH,
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().valueType(ValueType.FLOAT).value(2.1d).build())
+            .build());
+    ConfigDbEntity currentConfig = ConfigDbEntity.builder()
+        .configuration(Configuration.builder().config(config).build()).build();
+    ConfigDbEntity deltaDeviceConfig = deviceConfigManager
+        .findDeltaDeviceConfig(currentConfig, deviceDetails);
+    Assert.assertEquals(6, deltaDeviceConfig.getConfiguration().getConfig().size());
+  }
+
+  @Test
+  public void findDeltaDeviceConfig_deltaConfigAllAttributeDifferentValues_success()
+      throws ResourceNotFoundException {
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    deviceDetails.setSavedConfig(buildSavedDeviceConfigDetails());
+    deviceDetails.setId("1");
+    deviceDetails.setConnected(true);
+
+    mockConfigPathForDefaults();
+    ConfigDbEntity currentConfig = getConfigDbEntity();
+    ConfigDbEntity deltaDeviceConfig = deviceConfigManager
+        .findDeltaDeviceConfig(currentConfig, deviceDetails);
+    Assert.assertEquals(12, deltaDeviceConfig.getConfiguration().getConfig().size());
+  }
+
+  private SavedDeviceConfigDetails buildSavedDeviceConfigDetails() {
+    SavedDeviceConfigDetails savedDeviceConfigDetails = new SavedDeviceConfigDetails();
+    savedDeviceConfigDetails.setMuteMode(true);
+    savedDeviceConfigDetails.setHostName("H2");
+    savedDeviceConfigDetails.setNetworkProfile(2);
+    savedDeviceConfigDetails.setRadioSetId(13);
+    savedDeviceConfigDetails.setRadioCellId(1);
+    savedDeviceConfigDetails.setRadioSectorId(1);
+    savedDeviceConfigDetails.setAntennaAzimuth(2.0d);
+
+    Carrier carrier1 = new Carrier();
+    carrier1.setFrequency(100);
+    carrier1.setChannelWidth(2000);
+    Carrier carrier2 = new Carrier();
+    carrier2.setFrequency(101);
+    carrier2.setChannelWidth(2001);
+
+    savedDeviceConfigDetails.setCarrier1(carrier1);
+    savedDeviceConfigDetails.setCarrier2(carrier2);
+    savedDeviceConfigDetails.setRadioOperatorId(1);
+
+    return savedDeviceConfigDetails;
+  }
+
+  private ConfigDbEntity getConfigDbEntity() {
+    HashMap<String, ConfigDetails> config = new HashMap<>();
+    config.put(DefaultStartUpConfigConstant.HOSTNAME_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value("H1").build()).build());
+    config.put(DefaultStartUpConfigConstant.NETWORK_PROFILE_YANG_PATH, ConfigDetails.builder()
+        .pathValue(PathValue.builder().value(1).build()).build());
+    config.put(DefaultStartUpConfigConstant.getRadioOperatorIdConfigPath().getYangPath(),
+        ConfigDetails.builder()
+            .pathValue(PathValue.builder().value(1).build()).build());
+    for (int i = 0; i < 2; i++) {
+      config.put(DefaultStartUpConfigConstant.getRadioFrequencyConfigPath(i).getYangPath(),
+          ConfigDetails.builder()
+              .pathValue(PathValue.builder().value(i + 500).build()).build());
+      config.put(DefaultStartUpConfigConstant.getRadioChannelWidthConfigPath(i).getYangPath(),
+          ConfigDetails.builder()
+              .pathValue(PathValue.builder().value(i + 1000).build()).build());
+    }
+    ConfigDbEntity currentConfig = ConfigDbEntity.builder()
+        .configuration(Configuration.builder().config(config).build()).build();
+    return currentConfig;
+  }
+
+  @Test
+  public void pushAndSaveDeltaConfiguration_prevConfig_newConfig_success() throws Exception {
+    Method pushAndSaveDeltaConfiguration = DefaultStartUpConfigManager.class.getDeclaredMethod(
+        "pushAndSaveDeltaConfiguration",
+        new Class[]{ConfigDbEntity.class, DeviceDetails.class});
+    pushAndSaveDeltaConfiguration.setAccessible(true);
+    ConfigDbEntity configDbEntity = getConfigDbEntity();
+    DeviceDetails deviceDetails = buildDeviceDetails();
+    deviceDetails.setConfigPushEnabled(true);
+    deviceDetails.setSavedConfig(buildSavedDeviceConfigDetails());
+    deviceDetails.setAuthenticated(true);
+    ReflectionTestUtils.setField(deviceConfigManager, "defaultStartupWhitelistConfig",
+        defaultStartupWhitelistConfig);
+    ReflectionTestUtils.setField(deviceConfigManager, "configDbRepository", configDbRepository);
+    when(configDbRepository.save(any(ConfigDbEntity.class))).thenReturn(configDbEntity);
+    when(configDbRepository.getConfigDbEntity(any(), any(), any(), any())).thenReturn(
+        configDbEntity);
+    mockConfigPathForDefaults();
+    SetDeviceConfigWorkflowClientExternal workflowClient = Mockito
+        .mock(SetDeviceConfigWorkflowClientExternal.class);
+    when(setConfigurationwfClientExternalFactory.getClient(anyString()))
+        .thenReturn(workflowClient);
+    doNothing().when(workflowClient).start(any(), any());
+    DeviceConfigOperationResponse deviceConfigOperationResponse = (DeviceConfigOperationResponse) pushAndSaveDeltaConfiguration.invoke(
+        deviceConfigManager,
+        new Object[]{configDbEntity, deviceDetails});
+    verify(configDbRepository, times(2)).save(any());
+    verify(workflowClient, times(1)).start(anyString(), any());
+  }
+
+  private SaveDeviceConfigRequest getSaveDeviceConfigRequest() {
+    return SaveDeviceConfigRequest.builder().deviceType(DeviceType.BN).build();
+  }
+
+  private ConfigPath getConfigPath() {
+    return ConfigPath.builder().valueType(ValueType.STRING)
+        .yangPath("/x/y/z")
+        .name("somename")
+        .valueType(ValueType.STRING)
+        .appliedAt(ApplicableTarget.SELF)
+        .build();
+  }
+
+  private void mockConfigPathForDefaults() throws ResourceNotFoundException {
+    ConfigPathMapper configPathMapper = new ConfigPathMapper();
+    when(configPathComponent.getConfigPath(DefaultStartUpConfigConstant.CELL_ID))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getCellIdConfigPath()));
+    when(configPathComponent.getConfigPath(DefaultStartUpConfigConstant.SECTOR_ID))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getSectorIdConfigPath()));
+    when(configPathComponent.getConfigPath(DefaultStartUpConfigConstant.HOSTNAME))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getHostnameConfigPath()));
+    when(configPathComponent.getConfigPath(DefaultStartUpConfigConstant.LOG_ENDPOINT))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getLogEndPointConfigPath()));
+    when(configPathComponent.getConfigPath(DefaultStartUpConfigConstant.STREAMING_LOG_ENDPOINT))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getStreamingLogEndPointConfigPath()));
+    when(configPathComponent.getConfigPath(DefaultStartUpConfigConstant.SET_ID))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getSetIdConfigPath()));
+    when(configPathComponent.getConfigPath(DefaultStartUpConfigConstant.NETWORK_PROFILE))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getNetworkProfileConfigPath()));
+    when(configPathComponent.getConfigPath(DefaultStartUpConfigConstant.SNAPSHOT_URL))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getSnapshotURLConfigPath()));
+    when(configPathComponent.getConfigPath(DefaultStartUpConfigConstant.TRANSMISSION_ENABLED))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getMutedConfigPath()));
+    when(configPathComponent.getConfigPath(DefaultStartUpConfigConstant.CLASSIFIER_TYPE))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getClassifierTypeConfigPath()));
+    when(configPathComponent.getConfigPath(MANAGEMENT_IP_PREFIX))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getManagementIpPrefixConfigPath()));
+    when(configPathComponent.getConfigPath(LATITUDE))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getLatitudeConfigPath()));
+    when(configPathComponent.getConfigPath(LONGITUDE))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getLongitudeConfigPath()));
+    when(configPathComponent.getConfigPath(SLA_PROFILE))
+        .thenReturn(configPathMapper
+            .buildConfigPath(DefaultStartUpConfigConstant.getSlaProfileConfigPath()));
+    when(configPathComponent
+        .getConfigPath(DefaultStartUpConfigConstant.RADIO_OPERATOR_ID))
+        .thenReturn(configPathMapper
+            .buildConfigPath(
+                DefaultStartUpConfigConstant.getRadioOperatorIdConfigPath()));
+    when(configPathComponent
+        .getConfigPath(DefaultStartUpConfigConstant.AZIMUTH))
+        .thenReturn(configPathMapper
+            .buildConfigPath(
+                DefaultStartUpConfigConstant.getAzimuthConfigPath()));
+    when(configPathComponent
+        .getConfigPath(DefaultStartUpConfigConstant.DATA_VLAN))
+        .thenReturn(configPathMapper
+            .buildConfigPath(
+                DefaultStartUpConfigConstant.getDataVlanConfigPath()));
+    for (int radioId = 0; radioId < 2; radioId++) {
+      when(configPathComponent
+          .getConfigPath(DefaultStartUpConfigConstant.getRadioChannelWidthName(radioId)))
+          .thenReturn(configPathMapper
+              .buildConfigPath(
+                  DefaultStartUpConfigConstant.getRadioChannelWidthConfigPath(radioId)));
+      when(configPathComponent
+          .getConfigPath(DefaultStartUpConfigConstant.getRadioFrequencyName(radioId)))
+          .thenReturn(configPathMapper
+              .buildConfigPath(
+                  DefaultStartUpConfigConstant.getRadioFrequencyConfigPath(radioId)));
+    }
+  }
+
+  private DeviceDetails buildDeviceDetails() {
+    DeviceDetails deviceDetails = new DeviceDetails();
+    deviceDetails.setId("1");
+    deviceDetails.setIp("127.0.0.1");
+    deviceDetails.setPort(55555);
+    deviceDetails.setSectorId(1);
+    deviceDetails.setHostName("device1");
+    deviceDetails.setType("BN");
+    deviceDetails.setRetailerId(2);
+    deviceDetails.setConnected(true);
+    Ancestry ancestry = new Ancestry();
+    OperatorDetails operatorDetails = new OperatorDetails();
+    operatorDetails.setId(1);
+    ancestry.setOperator(operatorDetails);
+    deviceDetails.setAncestry(ancestry);
+    return deviceDetails;
+  }
+}

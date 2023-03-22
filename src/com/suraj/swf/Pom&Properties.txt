@@ -1,0 +1,24 @@
+<dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-swf-libraries</artifactId>
+      <version>1.11.22</version>
+    </dependency>
+
+<dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-swf-build-tools</artifactId>
+      <version>1.1</version>
+    </dependency>
+
+#AWS
+aws.accesskey=SECRET_FROM_VAULT
+aws.secretkey=SECRET_FROM_VAULT
+aws.region=us-east-1
+aws.swf.domain=device-config-dev
+aws.swf.workflow.tasklist=workflowTaskList
+aws.swf.activity.tasklist=activityTaskList
+aws.swf.workflow.threads.max=20
+aws.swf.activity.threads.max=20
+aws.swf.connectionTimeout=1000
+aws.swf.socketTimeout=120000
+aws.swf.connectionTTL=-1

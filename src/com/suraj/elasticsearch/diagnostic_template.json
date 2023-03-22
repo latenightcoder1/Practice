@@ -1,0 +1,79 @@
+{
+  "index_patterns": [
+    "diagnostic-*"
+  ],
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 1
+  },
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "longs": {
+          "mapping": {
+            "type": "long"
+          },
+          "match_mapping_type": "long"
+        }
+      },
+      {
+        "strings": {
+          "mapping": {
+            "ignore_above": 256,
+            "type": "keyword"
+          },
+          "match_mapping_type": "string"
+        }
+      }
+    ],
+    "properties": {
+      "diagnosticOperation": {
+        "properties": {
+          "operationId": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "batchOperationId": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "deviceId": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "diagnosticOperationStatus": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "deviceOperationStatus": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "diagnosticType": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "operationType": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "linkDiagnosticSubtype": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "deviceType": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "hostName": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "diagnosticResults": {
+        "type": "nested"
+      }
+    }
+  }
+}

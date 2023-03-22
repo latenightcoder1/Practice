@@ -1,0 +1,21 @@
+<!-- elastic search -->
+    <dependency>
+      <groupId>org.elasticsearch.client</groupId>
+      <artifactId>elasticsearch-rest-high-level-client</artifactId>
+      <version>${elasticsearch.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.elasticsearch</groupId>
+      <artifactId>elasticsearch</artifactId>
+      <version>${elasticsearch.version}</version>
+    </dependency>
+
+common.elasticsearch.pipeline.directory=pipelines/
+common.elasticsearch.pipelines=diagnostic_pipeline,v1_speed_test_pipeline,v1_baseline_speed_test_pipeline
+
+elasticsearch.indices.templates.sync.enable=true
+elasticsearch.indices.templates.names=diagnostic_template,v1_speed_test_template,v1_baseline_speed_test_template
+
+spring.elasticsearch.rest.uris=${elasticsearch.url}
+spring.elasticsearch.rest.username=${elasticsearch.username}
+spring.elasticsearch.rest.password=${elasticsearch.password}

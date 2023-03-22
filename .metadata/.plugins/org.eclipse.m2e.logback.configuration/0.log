@@ -1,0 +1,142 @@
+2021-08-27 18:23:57,775 [Worker-7: Loading available Gradle versions] INFO  o.e.b.c.i.u.g.PublishedGradleVersions - Gradle version information cache is up-to-date. Trying to read.
+2021-08-27 18:24:38,497 [Worker-10: Importing Maven projects] INFO  o.e.m.c.i.l.LifecycleMappingFactory - Using org.eclipse.m2e.jdt.JarLifecycleMapping lifecycle mapping for MavenProject: com.tarana.tcc.deviceconfig:deviceconfig-service-java-client:0.0.1-SNAPSHOT @ C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service-java-client\pom.xml.
+2021-08-27 18:24:39,223 [Worker-10: Importing Maven projects] INFO  o.e.m.c.i.l.LifecycleMappingFactory - Using NULL lifecycle mapping for MavenProject: com.tarana.tcc.deviceconfig:deviceconfig-parent:0.0.1-SNAPSHOT @ C:\Users\suraj kumar\local_device_config\device-config\pom.xml.
+2021-08-27 18:24:39,502 [Worker-10: Importing Maven projects] INFO  o.e.m.c.i.l.LifecycleMappingFactory - Using org.eclipse.m2e.jdt.JarLifecycleMapping lifecycle mapping for MavenProject: com.tarana.tcc.deviceconfig:deviceconfig-service-integration-test:0.0.1-SNAPSHOT @ C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service-integration-test\pom.xml.
+2021-08-27 18:24:40,184 [Worker-10: Importing Maven projects] INFO  o.e.m.c.i.p.WorkspaceClassifierResolverManager - Resolving P/deviceconfig-service-java-client: com.tarana.tcc.deviceconfig:deviceconfig-service-java-client:0.0.1-SNAPSHOT with classifier  to /deviceconfig-service-java-client/target/classes
+2021-08-27 18:24:40,738 [Worker-10: Importing Maven projects] INFO  o.e.m.c.i.l.LifecycleMappingFactory - Using org.eclipse.m2e.jdt.JarLifecycleMapping lifecycle mapping for MavenProject: com.tarana.tcc.deviceconfig:deviceconfig-service:0.0.1-SNAPSHOT @ C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service\pom.xml.
+2021-08-27 18:24:45,681 [Worker-10: Importing Maven projects] INFO  o.e.m.c.i.l.LifecycleMappingFactory - Using org.eclipse.m2e.jdt.JarLifecycleMapping lifecycle mapping for MavenProject: com.tarana.tcc.deviceconfig:deviceconfig-service-java-client:0.0.1-SNAPSHOT @ C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service-java-client\pom.xml.
+2021-08-27 18:24:45,980 [Worker-10: Importing Maven projects] INFO  o.e.m.c.i.l.LifecycleMappingFactory - Using org.eclipse.m2e.jdt.JarLifecycleMapping lifecycle mapping for MavenProject: com.tarana.tcc.deviceconfig:deviceconfig-service-integration-test:0.0.1-SNAPSHOT @ C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service-integration-test\pom.xml.
+2021-08-27 18:24:46,029 [Worker-10: Importing Maven projects] INFO  o.e.m.c.i.p.WorkspaceClassifierResolverManager - Resolving P/deviceconfig-service-java-client: com.tarana.tcc.deviceconfig:deviceconfig-service-java-client:0.0.1-SNAPSHOT with classifier  to /deviceconfig-service-java-client/target/classes
+2021-08-27 18:24:47,991 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding source folder /deviceconfig-service-java-client/src/main/java
+2021-08-27 18:24:47,992 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding source folder /deviceconfig-service-java-client/src/test/java
+2021-08-27 18:24:50,319 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding source folder /deviceconfig-service-integration-test/src/main/java
+2021-08-27 18:24:50,324 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding source folder /deviceconfig-service-integration-test/src/test/java
+2021-08-27 18:24:50,324 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding resource folder /deviceconfig-service-integration-test/src/test/resources
+2021-08-27 18:24:53,687 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding source folder /deviceconfig-service/src/main/java
+2021-08-27 18:24:53,693 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding source folder /deviceconfig-service/target/generated-sources/annotations
+2021-08-27 18:24:53,694 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding resource folder /deviceconfig-service/src/main/resources
+2021-08-27 18:24:53,701 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding resource folder /deviceconfig-service/src/main/resources
+2021-08-27 18:24:53,711 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding source folder /deviceconfig-service/src/test/java
+2021-08-27 18:24:53,712 [Worker-10: Importing Maven projects] INFO  o.e.m.j.i.AbstractJavaProjectConfigurator - Adding resource folder /deviceconfig-service/src/test/resources
+2021-08-27 18:25:02,150 [Worker-10: Importing Maven projects] INFO  o.e.m.c.i.p.ProjectConfigurationManager - Imported and configured 4 project(s) in 26 sec
+2021-08-27 18:25:09,064 [Worker-4: Discover lifecycle mappings] INFO  o.e.m.i.discovery.MavenDiscovery - No lifecyle mapping found at jar:file:/C:/Users/SURAJK~1/AppData/Local/Temp/RemoteBundleDiscoveryStrategy3203255220967942311.tmp/org.eclipse.m2e.discovery.oss_catalog_1.14.jar_3923651816588112013.jar!/lifecycle%2Forg.eclipse.m2e.discovery.lifecyclemapping.m2e-wtp.xml
+2021-08-27 18:25:09,065 [Worker-4: Discover lifecycle mappings] WARN  o.e.m.i.discovery.MavenDiscovery - CatalogItem org.eclipse.m2e.discovery.lifecyclemapping.m2e-wtp does not contain lifecycle mapping metadata
+2021-08-27 18:25:09,067 [Worker-4: Discover lifecycle mappings] INFO  o.e.m.i.discovery.MavenDiscovery - No lifecyle mapping found at jar:file:/C:/Users/SURAJK~1/AppData/Local/Temp/RemoteBundleDiscoveryStrategy3203255220967942311.tmp/org.eclipse.m2e.discovery.oss_catalog_1.14.jar_3923651816588112013.jar!/lifecycle%2Forg.eclipse.m2e.discovery.lifecyclemapping.m2e-egit.xml
+2021-08-27 18:25:09,068 [Worker-4: Discover lifecycle mappings] WARN  o.e.m.i.discovery.MavenDiscovery - CatalogItem org.eclipse.m2e.discovery.lifecyclemapping.m2e-egit does not contain lifecycle mapping metadata
+2021-08-27 18:25:09,069 [Worker-4: Discover lifecycle mappings] INFO  o.e.m.i.discovery.MavenDiscovery - No lifecyle mapping found at jar:file:/C:/Users/SURAJK~1/AppData/Local/Temp/RemoteBundleDiscoveryStrategy3203255220967942311.tmp/org.eclipse.m2e.discovery.oss_catalog_1.14.jar_3923651816588112013.jar!/lifecycle%2Forg.eclipse.m2e.discovery.lifecyclemapping.m2e-subversive.xml
+2021-08-27 18:25:09,070 [Worker-4: Discover lifecycle mappings] WARN  o.e.m.i.discovery.MavenDiscovery - CatalogItem org.eclipse.m2e.discovery.lifecyclemapping.m2e-subversive does not contain lifecycle mapping metadata
+2021-08-27 18:25:09,099 [Worker-4: Discover lifecycle mappings] INFO  o.e.m.i.discovery.MavenDiscovery - No lifecyle mapping found at jar:file:/C:/Users/SURAJK~1/AppData/Local/Temp/RemoteBundleDiscoveryStrategy3203255220967942311.tmp/org.eclipse.m2e.discovery.oss_catalog_1.14.jar_3923651816588112013.jar!/lifecycle%2Forg.eclipse.m2e.discovery.extras.m2e-chromatic.xml
+2021-08-27 18:25:09,099 [Worker-4: Discover lifecycle mappings] WARN  o.e.m.i.discovery.MavenDiscovery - CatalogItem org.eclipse.m2e.discovery.extras.m2e-chromatic does not contain lifecycle mapping metadata
+2021-08-27 18:25:14,816 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:25:14,821 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 9 resources
+2021-08-27 18:25:16,151 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - dotGitDirectory C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service\..\.git
+2021-08-27 18:25:16,540 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.build.user.name with value suraj kumar
+2021-08-27 18:25:16,542 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.build.user.email with value skumar@taranawireless.com
+2021-08-27 18:25:16,609 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.branch with value TCC-5312_attributes_addition
+2021-08-27 18:25:16,613 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - --always = true
+2021-08-27 18:25:16,614 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - --dirty = -dirty
+2021-08-27 18:25:16,617 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - --abbrev = 7
+2021-08-27 18:25:16,631 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Tag refs [[]]
+2021-08-27 18:25:16,632 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Created map: [{}]
+2021-08-27 18:25:16,634 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - evalCommit is [cc1fba96ef0cebcd5d345f208b1ecf26bea0b814]
+2021-08-27 18:25:16,867 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.commit.id.describe with value cc1fba9-dirty
+2021-08-27 18:25:16,867 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.commit.id.describe-short with value cc1fba9-dirty
+2021-08-27 18:25:16,868 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.commit.id with value cc1fba96ef0cebcd5d345f208b1ecf26bea0b814
+2021-08-27 18:25:16,869 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.commit.id.abbrev with value cc1fba9
+2021-08-27 18:25:16,924 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.dirty with value true
+2021-08-27 18:25:16,926 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.commit.user.name with value suraj kumar
+2021-08-27 18:25:16,927 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.commit.user.email with value skumar@taranawireless.com
+2021-08-27 18:25:16,928 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.commit.message.full with value DCS Add logic to populate attributes
+
+attributes like (new/previous)Configuration populated
+
+Feature-ID: TCC-5312
+2021-08-27 18:25:16,929 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.commit.message.short with value DCS Add logic to populate attributes
+2021-08-27 18:25:16,930 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.commit.time with value 2021-08-26T19:41:59+0530
+2021-08-27 18:25:16,931 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.remote.origin.url with value git@gitlab.taranawireless.com:tarana3/tcc/services/device-config.git
+2021-08-27 18:25:16,936 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.tags with value 
+2021-08-27 18:25:16,947 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - evalCommit is [cc1fba96ef0cebcd5d345f208b1ecf26bea0b814]
+2021-08-27 18:25:16,951 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Tag refs [[]]
+2021-08-27 18:25:16,951 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Created map: [{}]
+2021-08-27 18:25:16,956 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.closest.tag.name with value 
+2021-08-27 18:25:16,967 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - evalCommit is [cc1fba96ef0cebcd5d345f208b1ecf26bea0b814]
+2021-08-27 18:25:16,969 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Tag refs [[]]
+2021-08-27 18:25:16,969 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Created map: [{}]
+2021-08-27 18:25:16,972 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.closest.tag.commit.count with value 
+2021-08-27 18:25:16,979 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.total.commit.count with value 156
+2021-08-27 18:25:27,140 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.local.branch.ahead with value 0
+2021-08-27 18:25:27,140 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.local.branch.behind with value 0
+2021-08-27 18:25:27,144 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.build.time with value 2021-08-27T18:25:27+0530
+2021-08-27 18:25:27,145 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.build.version with value 0.0.1-SNAPSHOT
+2021-08-27 18:25:27,145 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Collected git.build.host with value LAPTOP-33NM4GKH
+2021-08-27 18:25:27,145 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.build.user.email in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.build.host in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.dirty in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.local.branch.behind in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.remote.origin.url in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.closest.tag.name in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.local.branch.ahead in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.total.commit.count in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.commit.id.describe-short in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.commit.user.email in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.commit.time in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.commit.message.full in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.build.version in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.commit.message.short in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.commit.id.abbrev in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.branch in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.build.user.name in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.closest.tag.commit.count in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.commit.id.describe in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.commit.id in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.tags in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.build.time in results
+2021-08-27 18:25:27,146 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - including property git.commit.user.name in results
+2021-08-27 18:25:27,155 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Writing properties file to [C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service\target\classes\git.properties] (for module Device Config Service)...
+2021-08-27 18:25:30,889 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:25:30,890 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 1 resource to META-INF
+2021-08-27 18:25:30,902 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 4 resources
+2021-08-27 18:25:30,931 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:25:30,931 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 4 resources
+2021-08-27 18:25:31,242 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:25:31,242 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - skip non existing resourceDirectory C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service-java-client\src\main\resources
+2021-08-27 18:25:31,242 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - skip non existing resourceDirectory C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service-java-client\src\main\resources
+2021-08-27 18:25:31,244 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:25:31,244 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - skip non existing resourceDirectory C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service-java-client\src\test\resources
+2021-08-27 18:25:31,564 [Worker-6: Building] INFO  o.e.m.c.i.p.WorkspaceClassifierResolverManager - Resolving P/deviceconfig-service-java-client: com.tarana.tcc.deviceconfig:deviceconfig-service-java-client:0.0.1-SNAPSHOT with classifier  to /deviceconfig-service-java-client/target/classes
+2021-08-27 18:25:31,570 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:25:31,570 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - skip non existing resourceDirectory C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service-integration-test\src\main\resources
+2021-08-27 18:25:31,571 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - skip non existing resourceDirectory C:\Users\suraj kumar\local_device_config\device-config\deviceconfig-service-integration-test\src\main\resources
+2021-08-27 18:25:31,574 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:25:31,575 [Worker-6: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 2 resources
+2021-08-27 18:25:46,294 [Worker-16: Fetching changes before synchronization launch] INFO  o.a.s.c.u.s.e.EdDSASecurityProviderRegistrar - getOrCreateProvider(EdDSA) created instance of net.i2p.crypto.eddsa.EdDSASecurityProvider
+2021-08-27 18:25:46,416 [Worker-16: Fetching changes before synchronization launch] INFO  o.a.s.c.i.DefaultIoServiceFactoryFactory - No detected/configured IoServiceFactoryFactory using Nio2ServiceFactoryFactory
+2021-08-27 18:25:46,498 [Worker-3: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:25:46,500 [Worker-3: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 0 resource
+2021-08-27 18:25:46,504 [Worker-3: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:25:46,507 [Worker-3: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 1 resource to META-INF
+2021-08-27 18:25:46,508 [Worker-3: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 4 resources
+2021-08-27 18:25:46,510 [Worker-3: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:25:46,511 [Worker-3: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 0 resource
+2021-08-27 18:27:17,113 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:27:17,114 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 0 resource
+2021-08-27 18:27:17,120 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:27:17,121 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 0 resource to META-INF
+2021-08-27 18:27:17,121 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 0 resource
+2021-08-27 18:27:17,123 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:27:17,124 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 4 resources
+2021-08-27 18:27:27,113 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:27:27,114 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 0 resource
+2021-08-27 18:27:27,117 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:27:27,118 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 0 resource to META-INF
+2021-08-27 18:27:27,118 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 0 resource
+2021-08-27 18:27:27,121 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 18:27:27,122 [Worker-20: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 4 resources
+2021-08-27 19:58:06,395 [Worker-17: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 19:58:06,396 [Worker-17: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 0 resource
+2021-08-27 19:58:09,696 [Worker-17: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 19:58:09,697 [Worker-17: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 1 resource to META-INF
+2021-08-27 19:58:09,698 [Worker-17: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 4 resources
+2021-08-27 19:58:09,700 [Worker-17: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Using 'UTF-8' encoding to copy filtered resources.
+2021-08-27 19:58:09,701 [Worker-17: Building] INFO  o.e.m.c.i.embedder.EclipseLogger - Copying 0 resource
+2021-08-30 08:42:38,823 [Worker-7: Loading available Gradle versions] INFO  o.e.b.c.i.u.g.PublishedGradleVersions - Gradle version information cache is out-of-date. Trying to update.

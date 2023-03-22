@@ -1,0 +1,22 @@
+{
+  "description" : "version1.0",
+  "processors": [
+    {
+      "set": {
+        "field": "writeTime",
+        "value": "{{_ingest.timestamp}}"
+      }
+    },
+    {
+      "date_index_name": {
+        "field": "timeCreated",
+        "index_name_prefix": "diagnostic-",
+        "date_formats": [
+          "UNIX_MS"
+        ],
+        "date_rounding": "d",
+        "index_name_format": "yyyy-MM"
+      }
+    }
+  ]
+}
